@@ -1,13 +1,14 @@
 """
 Author: Ido Shema
-Date: 01/11/2024
-Description: simple dataBase class that turns into file
+Date: 13/01/2025
+Description: Simple database class that turns into a file using Windows API.
 """
 from DataBase import DataBase
-import pickle
+import win32file
 import os
+import json
 
-FILE_PATH = "file.pkl"
+FILE_PATH = "file.json"
 
 
 class DataBaseFile(DataBase):
@@ -17,26 +18,49 @@ class DataBaseFile(DataBase):
 
     def dump(self):
         """
-            saves the database into a file
-            :return: None
+        Saves the database into a file using Windows API.
         """
-        with open(FILE_PATH, 'wb') as file:
-            pickle.dump(self.dict, file)
+        data = json.dumps(self.dict).encode('utf-8')
+        handle = win32file.CreateFile(
+            FILE_PATH,
+            win32file.GENERIC_WRITE,
+            win32file.FILE_SHARE_READ | win32file.FILE_SHARE_WRITE,
+            None,
+            win32file.CREATE_ALWAYS,
+            0,
+            None
+        )
+        try:
+            win32file.WriteFile(handle, data)
+        finally:
+            win32file.CloseHandle(handle)
 
     def load(self):
         """
-            gets the data from a file and puts it into database
-            :return: None
+        Loads the data from a file using Windows API and updates the database.
         """
-        with open(FILE_PATH, 'rb') as file:
-            self.dict = pickle.load(file)
+        if not os.path.exists(FILE_PATH):
+            self.dict = {}
+            return
+
+        handle = win32file.CreateFile(
+            FILE_PATH,
+            win32file.GENERIC_READ,
+            win32file.FILE_SHARE_READ | win32file.FILE_SHARE_WRITE,
+            None,
+            win32file.OPEN_EXISTING,
+            0,
+            None
+        )
+        try:
+            _, data = win32file.ReadFile(handle, os.path.getsize(FILE_PATH))
+            self.dict = json.loads(data.decode('utf-8'))
+        finally:
+            win32file.CloseHandle(handle)
 
     def set_value(self, key, val):
         """
-            sets the value and the key in the database
-            :param val: value of key
-            :param key: the key
-            :return: None
+        Sets the value for a key in the database.
         """
         self.load()
         super().set_value(key, val)
@@ -44,18 +68,14 @@ class DataBaseFile(DataBase):
 
     def get_value(self, key):
         """
-            gets the value of a certain key
-            :param key: the key
-            :return: value of a certain key
+        Gets the value for a key in the database.
         """
         self.load()
         return super().get_value(key)
 
     def delete_value(self, key):
         """
-            deletes the value of a certain key
-            :param key: the key
-            :return: None
+        Deletes a key-value pair from the database.
         """
         self.load()
         super().delete_value(key)
@@ -73,4 +93,4 @@ if __name__ == '__main__':
     db_file.delete_value("cyber")
     assert db_file.get_value("cyber") is None, "delete value failed"
 
-    print("success")
+    print("Success")
