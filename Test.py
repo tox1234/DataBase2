@@ -1,6 +1,6 @@
 """
 Author: Ido Shema
-Date: 01/11/2024
+Date: 13/01/2025
 Description: tests for database
 """
 import threading
@@ -10,7 +10,7 @@ from DataBaseSync import DataBaseSync
 class Test:
     def __init__(self):
         self.threads = []
-        self.db = DataBaseSync('Thread', {})
+        self.db = DataBaseSync({})
 
     def number1(self):
         self.db.set_value('cyber', 'cool')
