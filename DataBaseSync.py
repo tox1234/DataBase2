@@ -1,72 +1,76 @@
 """
 Author: Ido Shema
-Date: 01/11/2024
-Description: simple dataBase class that support threading and processing
+Date: 13/01/2025
+Description: simple dataBase class that supports threading using WinAPI synchronization primitives.
 """
 import time
 from DataBaseFile import DataBaseFile
-import threading
-import multiprocessing
+import win32event
+
 MAX = 10
 
 
 class DataBaseSync(DataBaseFile):
-    def __init__(self, mode, dict_=None):
+    def __init__(self, dict_=None):
         super().__init__(dict_)
 
         if dict_ is None:
             dict_ = {}
 
-        if mode == 'Thread':
-            self.write = threading.Lock()
-            self.read = threading.Semaphore(MAX)
-
-        elif mode == 'Process':
-            self.write = multiprocessing.Lock()
-            self.read = multiprocessing.Semaphore(MAX)
+        self.write_mutex = win32event.CreateMutex(None, False, None)
+        self.read_semaphore = win32event.CreateSemaphore(None, MAX, MAX, None)
 
     def set_value(self, key, val):
         """
-            sets the value and the key in the database
+            Sets the value and the key in the database
             :param val: value of key
             :param key: the key
             :return: None
         """
-        with self.write:
+        win32event.WaitForSingleObject(self.write_mutex, win32event.INFINITE)
 
-            for i in range(MAX):
-                self.read.acquire()
+        try:
+            for _ in range(MAX):
+                win32event.WaitForSingleObject(self.read_semaphore, win32event.INFINITE)
 
             super().set_value(key, val)
             time.sleep(2)
+        finally:
+            for _ in range(MAX):
+                win32event.ReleaseSemaphore(self.read_semaphore, 1)
 
-        for i in range(MAX):
-            self.read.release()
+            win32event.ReleaseMutex(self.write_mutex)
 
     def get_value(self, key):
         """
-            gets the value of a certain key
+            Gets the value of a certain key
             :param key: the key
             :return: value of a certain key
         """
-        with self.read:
+        win32event.WaitForSingleObject(self.read_semaphore, win32event.INFINITE)
+        try:
             value = super().get_value(key)
             time.sleep(2)
+        finally:
+            win32event.ReleaseSemaphore(self.read_semaphore, 1)
+
         return value
 
     def delete_value(self, key):
         """
-            deletes the value of a certain key
+            Deletes the value of a certain key
             :param key: the key
             :return: None
         """
-        with self.write:
+        win32event.WaitForSingleObject(self.write_mutex, win32event.INFINITE)
 
-            for i in range(MAX):
-                self.read.acquire()
+        try:
+            for _ in range(MAX):
+                win32event.WaitForSingleObject(self.read_semaphore, win32event.INFINITE)
 
             super().delete_value(key)
+        finally:
+            for _ in range(MAX):
+                win32event.ReleaseSemaphore(self.read_semaphore, 1)
 
-        for i in range(MAX):
-            self.read.release()
-
+            win32event.ReleaseMutex(self.write_mutex)
